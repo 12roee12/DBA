@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+<!-- > This is the welcome page. Here the user can see every chart he wants. <!-->
+
+{% block content %}
+<head>
+    <meta charset="UTF-8">
+    <title>WELCOME</title>
+</head>
+<body>
+    <h1>{% block title %} WELCOME to the DBA {% endblock %}</h1>
+    <form method="post">
+        <div class="form-group">
+            <select name="genre" id="genre" id="genre" class="form-control" value="{{ request.form['genre'] }}">
+                <option value="rock">Rock</option>
+                <option value="pop">Pop</option>
+                <option value="reggae">Reggae</option>
+                <option value="else">Else</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary">Select genre. When finish, push me :)</button>
+        </div>
+    </form>
+
+    {%for i in range(0, len)%}
+
+        <a href="{{ url_for('chart', chart_name=charts[i][0]) }}"><h2>{{charts[i][0]}}</h2></a>
+        <p>Genre: {{charts[i][1]}}</p>
+        <hr>
+
+    {% endfor %}
+</body>
+
+{% endblock %}

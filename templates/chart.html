@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+
+
+{% block content %}
+<html>
+      <head>
+          <title>Title of the document</title>
+      </head>
+      <body>
+
+          <h1>Play {{ name }}</h1>
+          <p>Open a PDF file <a href="{{ path }}">{{ path }}</a>
+    </p>
+
+          {% for i in range(0, len) %}
+              <h3>by: {{ comments[i][0] }}</h3>
+              <p>{{ comments[i][1] }}</p>
+          {% endfor %}
+
+          <h4>Add a comment:</h4>
+          <form action="/handle_message" method="post">
+              <div class="form-group">
+                  <label for="content">Content</label>
+                  <textarea name="content" placeholder="Comment content" id="content"
+                            class="form-control">{{ request.form['content'] }}</textarea>
+              </div>
+              <div class="form-group">
+                  <button type="submit" class="btn btn-primary">Submit</button>
+              </div>
+          </form>
+
+      </body>
+</html>
+{% endblock %}

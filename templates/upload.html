@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+<!-- > This is the uploading page. Here the user can upload charts to the website, and see then is the welcome page. <!-->
+
+{% block content %}
+<h1>{% block title %} Upload a New Chart {% endblock %}</h1>
+
+<form method="post">
+    <div class="form-group">
+        <label for="name">Chart's name</label>
+        <input type="text" name="name"
+               placeholder="chart name" class="form-control" id="name"
+               value="{{ request.form['name'] }}"></input>
+    </div>
+
+    <div class="form-group">
+        <select name="genre" id="genre" id="genre" class="form-control" value="{{ request.form['genre'] }}">
+            <option value="rock">Rock</option>
+            <option value="pop">Pop</option>
+            <option value="reggae">Reggae</option>
+            <option value="else">Else</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="file">Select a file:</label>
+        <input type="file" id="file" name="file">
+    </div>
+    <div class="form-group">
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </div>
+</form>
+{% endblock %}
