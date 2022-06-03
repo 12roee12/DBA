@@ -1,8 +1,9 @@
-import hashlib
+import os
+import pickle
 import socket
 import webbrowser
 
-from flask import Flask, render_template, request, flash, url_for, session
+from flask import Flask, render_template, request, flash, url_for, session, send_file
 from werkzeug.utils import redirect
 
 app = Flask(__name__)
@@ -12,50 +13,46 @@ app.config['SECRET_KEY'] = 'de36039d4efd74a5e51ab16869e554fc'
 class Client:
 
     def __init__(self):
+        # in session client keeps info about user that might
+        # be used while the user goes between pages.
         self.session = session
         self.MAX_MSG_LENGTH = 1024
-        # connect to local server
-        # self.local_server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # self.local_server_connection.connect(("127.0.0.1", 1729))
+        # find the ip of the computer
+        hostname = socket.gethostname()
+        self.local_ip = socket.gethostbyname(hostname)
         # connect to server
         self.server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_connection.connect(("127.0.0.1", 5000))
+        self.server_connection.connect((self.local_ip, 5000))
 
     def send_to_server(self, msg):
-        self.server_connection.send(msg.encode())
-
-    def send_file_to_local_server(self, data):
-        msg = str(len(data)).zfill(8) + str(data)
-        self.local_server_connection.send(msg.encode())
-
-    def recv_from_local_server(self):
-        pass
+        # sends msgs to the server
+        # the type of the msg might be bytes or string
+        if type(msg) == str:
+            self.server_connection.send(msg.encode())
+        else:
+            self.server_connection.send(msg)
 
     def recv_info_from_server(self):
         order = self.server_connection.recv(1).decode()
         if order == "1":
+            # means server sent answer about whether the user put correct registration details or not
             return self.is_valid()
         elif order == "2":
-            return eval(self.get_charts())
+            # gets all the names of the charts
+            data = eval(self.get_data().decode())
+            return data
         elif order == "3":
-            self.send_file_to_local_server(self.get_file_from_server())
-        elif order == "4":
-            self.get_comments()
+            # gets specific file with his comments
+            return self.get_data(), self.get_data()
 
     def is_valid(self):
+        # the server sends or "True" or "False"
         return bool(self.server_connection.recv(self.MAX_MSG_LENGTH).decode())
 
-    def get_charts(self):
-        data_length = int(self.server_connection.recv(8).decode())
-        charts = ""
-        while data_length > self.MAX_MSG_LENGTH:
-            charts = charts + self.server_connection.recv(self.MAX_MSG_LENGTH).decode()
-            data_length = data_length - self.MAX_MSG_LENGTH
-        if data_length != 0:
-            charts = charts + self.server_connection.recv(data_length).decode()
-        return charts
-
-    def get_file_from_server(self):
+    def get_data(self):
+        # gets long data from server
+        # length is zfilled to 8 in advance
+        # returns data in bytes
         length = int(self.server_connection.recv(8).decode())
         data = b''
         while length > self.MAX_MSG_LENGTH:
@@ -65,18 +62,16 @@ class Client:
             data = data + self.server_connection.recv(length)
         return data
 
-    def get_comments(self):
-        length = int(self.server_connection.recv(8).decode())
-        data = ""
-        while length > self.MAX_MSG_LENGTH:
-            data = data + self.server_connection.recv(self.MAX_MSG_LENGTH).decode()
-            length = length - self.MAX_MSG_LENGTH
-        if length != 0:
-            data = data + self.server_connection.recv(length).decode()
-        return data
-
 
 app.c = Client()
+
+
+def convert_to_list(data):
+    try:
+        return eval(data)
+    except:
+        flash("Something didn't work. Maybe try again what you did :(")
+        return redirect(url_for('home'))
 
 
 @app.route('/')
@@ -126,6 +121,9 @@ def sign_up():
 @app.route('/home_page', methods=['POST', 'GET'])
 def home():
     if "name" in app.c.session:
+        if "file" in app.c.session:
+            os.remove(app.c.session["file"])
+            app.c.session.pop("file", None)
         if request.method == 'GET':
             msg = "6none"
             app.c.send_to_server(msg)
@@ -146,20 +144,32 @@ def chart(chart_name):
         if request.method == 'POST':
             form_data = request.form
             comment = form_data.getlist('content')
-            msg = "4" + str(len(chart_name)) + chart_name + str(len(app.c.session["name"])) \
-                  + app.c.session["name"] + comment
+            msg = "4" + str(len(chart_name)).zfill(2) + chart_name + str(len(app.c.session["name"])).zfill(2) \
+                  + app.c.session["name"] + str(comment)
+            app.c.send_to_server(msg)
+            comment = [app.c.session["name"], comment]
+            app.c.session["comments"].append(comment)
+            return render_template('chart.html', comments=app.c.session["comments"],
+                                   len=len(app.c.session["comments"]), name=chart_name)
         else:
             msg = "3" + chart_name
-        app.c.send_to_server(msg)
-        comments = app.c.recv_info_from_server()
-        return render_template('chart.html', comments=comments,
-                               len=len(comments), name=chart_name)
+            app.c.send_to_server(msg)
+            data, comments = app.c.recv_info_from_server()
+            comments = convert_to_list(comments)
+            app.c.session["comments"] = comments
+            create_file(chart_name, data)
+            app.c.session["file"] = chart_name + ".pdf"
+            return render_template('chart.html', comments=comments,
+                                   len=len(comments), name=chart_name)
     return redirect('/')
 
 
 @app.route('/upload', methods=['POST', 'GET'])
 def upload():
     if "name" in app.c.session:
+        if "file" in app.c.session:
+            os.remove(app.c.session["file"])
+            app.c.session.pop("file", None)
         if request.method == 'GET':
             return render_template('upload.html')
         # gets all the info from user
@@ -178,17 +188,38 @@ def upload():
             name = name.replace(" ", "_")
             name = name.replace('"', '')
             name = name.lower()
-            msg = "5" + str(len(name)) + name + genre
+            data = file.read()
+            file.close()
+            len_data = str(len(data)).zfill(8)
+            msg = "5" + str(len(name)).zfill(2) + name + str(len(genre)) + genre\
+                  + str(len(name)).zfill(2) + name + str(len_data).zfill(8)
+            msg = bytes(msg.encode()) + data
             app.c.send_to_server(msg)
             return redirect('/home_page')
     return redirect('/')
 
 
+@app.route('/download/<path:path>')
+def download_file(path):
+    path = 'templates\\files\\' + path + ".pdf"
+    return send_file(path, as_attachment=True)
+
+
 @app.route('/leave')
 def leave():
-    app.c.session["name"] = ""
+    if "file" in app.c.session:
+        os.remove(app.c.session["file"])
+        app.c.session.pop("file", None)
+    app.c.session.pop("name", None)
     app.c.send_to_server("9")
     app.c.server_connection.close()
+
+
+def create_file(name, data):
+    name = name + '.pdf'
+    file = open(name, 'ab')
+    pickle.dump(data, file)
+    file.close()
 
 
 if __name__ == "__main__":
