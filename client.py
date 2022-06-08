@@ -17,12 +17,9 @@ class Client:
         # be used while the user goes between pages.
         self.session = session
         self.MAX_MSG_LENGTH = 1024
-        # find the ip of the computer
-        hostname = socket.gethostname()
-        self.local_ip = socket.gethostbyname(hostname)
         # connect to server
         self.server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_connection.connect((self.local_ip, 5000))
+        self.server_connection.connect(("192.168.0.156", 5000))
 
     def send_to_server(self, msg):
         # sends msgs to the server
@@ -39,7 +36,7 @@ class Client:
             return self.is_valid()
         elif order == "2":
             # gets all the names of the charts
-            data = eval(self.get_data().decode())
+            data = convert_to_list(self.get_data().decode())
             return data
         elif order == "3":
             # gets specific file with his comments
@@ -141,6 +138,8 @@ def home():
 @app.route('/home_page/<string:chart_name>', methods=['POST', 'GET'])
 def chart(chart_name):
     if "name" in app.c.session:
+        if "file" in app.c.session:
+            os.remove(app.c.session["file"])
         if request.method == 'POST':
             form_data = request.form
             comment = form_data.getlist('content')
@@ -169,7 +168,6 @@ def upload():
     if "name" in app.c.session:
         if "file" in app.c.session:
             os.remove(app.c.session["file"])
-            app.c.session.pop("file", None)
         if request.method == 'GET':
             return render_template('upload.html')
         # gets all the info from user
@@ -191,8 +189,7 @@ def upload():
             data = file.read()
             file.close()
             len_data = str(len(data)).zfill(8)
-            msg = "5" + str(len(name)).zfill(2) + name + str(len(genre)) + genre\
-                  + str(len(name)).zfill(2) + name + str(len_data).zfill(8)
+            msg = "5" + str(len(name)).zfill(2) + name + str(len(genre)) + genre + str(len_data).zfill(8)
             msg = bytes(msg.encode()) + data
             app.c.send_to_server(msg)
             return redirect('/home_page')
@@ -201,7 +198,7 @@ def upload():
 
 @app.route('/download/<path:path>')
 def download_file(path):
-    path = 'templates\\files\\' + path + ".pdf"
+    path = path + ".pdf"
     return send_file(path, as_attachment=True)
 
 
@@ -213,6 +210,7 @@ def leave():
     app.c.session.pop("name", None)
     app.c.send_to_server("9")
     app.c.server_connection.close()
+    return "BA-BAYY :)"
 
 
 def create_file(name, data):
