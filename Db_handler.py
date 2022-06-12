@@ -25,6 +25,12 @@ class Db_handler:
     def request_insert(self, request, stuff_to_insert):
         # with this function I can insert data into the database, such as username, password, and chart info.
         self.cursor.execute(request, stuff_to_insert)
+        
+    def delete(self, delete):
+        self.cursor.execute(f'DELETE FROM charts WHERE name=(%(delete)s)', delete)
+
+    def delete_table(self, table):
+        self.cursor.execute(f'DROP TABLE {table}')
 
     def commit(self):
         # to close the database.
