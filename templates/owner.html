@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+<!-- > this is the page that shows each user the charts he uploaded to the website, and lets him option to delete them. </!-->
+
+{% block content %}
+
+<head>
+    <meta charset="UTF-8">
+    <title>Your Place</title>
+</head>
+<body>
+    <h2> Charts you uploaded: </h2>
+    {% for i in range(0, length) %}
+        <h4>{{ charts[i][0] }}</h4>
+        <p><a href="{{ url_for('.delete', chart = charts[i][0]) }}">Delete</a></p>
+        <hr>
+    {% endfor %}
+</body>
+
+{% endblock %}
